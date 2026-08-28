@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = [
     ROOT / "scripts" / "capture_baseline.sh",
     ROOT / "scripts" / "capture_baseline_icmp.sh",
+    ROOT / "scripts" / "capture_covert_dns.sh",
+    ROOT / "scripts" / "capture_covert_icmp.sh",
 ]
 
 
@@ -27,6 +29,14 @@ def test_capture_scripts() -> None:
     targets = (ROOT / "scripts" / "ping_targets.txt").read_text().splitlines()
     assert 25 <= len(domains) <= 35
     assert {"8.8.8.8", "1.1.1.1", "192.168.56.10"} <= set(targets)
+
+    for script in SCRIPTS[2:]:
+        text = script.read_text()
+        assert "THIS SCRIPT MUST ONLY BE RUN INSIDE THE ISOLATED LAB NETWORK" in text
+        assert "read -r -p" in text
+        assert "eval " not in text
+        result = subprocess.run([bash, bash_path(script), "invalid"], capture_output=True)
+        assert result.returncode == 2
 
 
 if __name__ == "__main__":
