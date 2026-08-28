@@ -1,0 +1,16 @@
+# Documentation only: these are system/lab tools, not pip-installable dependencies.
+
+# Packet capture and protocol dissection used by pyshark.
+# tshark / Wireshark: https://github.com/wireshark/wireshark
+
+# DNS tunnel used only to generate labeled traffic in an isolated, authorized lab VM.
+# Iodine: https://github.com/yarrick/iodine
+
+# DNS command-and-control tunnel used only for isolated, authorized validation traffic.
+# dnscat2: https://github.com/iagox86/dnscat2
+
+# ICMP tunnel used only to generate labeled traffic in an isolated, authorized lab VM.
+# ptunnel (ptunnel-ng): https://github.com/utoni/ptunnel-ng
+
+# ICMP shell used only to generate labeled traffic in an isolated, authorized lab VM.
+# icmpsh: https://github.com/bdamele/icmpsh

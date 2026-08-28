@@ -1,0 +1,61 @@
+# SECURITY: Packet captures and generated network data may contain real traffic,
+# including private IP addresses and DNS queries from the researcher's machine.
+# They must never be committed; only the directory marker files are tracked.
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs and local AI tooling
+.vscode/
+.idea/
+.agents/
+.codex/
+
+# Environment files, credentials, and private keys
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Sensitive captures, extracted features, and external datasets
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/external/*
+!data/external/.gitkeep
+
+# Trained models (release artifacts are explicitly allowed)
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.onnx
+!models_release/
+!models_release/**
+
+# Streamlit
+.streamlit/
+
+# Tests, coverage, and tool caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/

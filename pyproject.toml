@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "covertlens"
+version = "0.1.0"
+description = "Cross-protocol covert channel detection via traffic side-channel statistics — no payload inspection, no signatures."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Muhammad Rehan Khan" },
+]
+dependencies = [
+    "pyshark",
+    "scapy",
+    "scikit-learn",
+    "torch",
+    "pandas",
+    "numpy",
+    "fastapi",
+    "uvicorn",
+    "streamlit",
+    "pydantic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "ruff",
+    "mypy",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["covertlens*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
