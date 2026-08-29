@@ -14,7 +14,13 @@ from typing import Any
 import pandas as pd
 import pyshark
 
-from covertlens.features.parse_dns import _field, _hex_bytes, _integer
+from covertlens.features.parse_dns import (
+    _field,
+    _hex_bytes,
+    _integer,
+    _nested_field,
+    _timestamp,
+)
 
 
 logger = logging.getLogger("covertlens.features.parse_icmp")
@@ -38,12 +44,14 @@ def _packet_row(packet: Any) -> dict[str, Any]:
     if ip is None:
         raise ValueError("ICMP packet has no IPv4 layer")
 
+    payload = _hex_bytes(_nested_field(icmp, "icmp.data_raw"))
     data_layer = getattr(packet, "data", None)
-    payload = _hex_bytes(_field(data_layer, "data")) if data_layer is not None else None
+    if payload is None and data_layer is not None:
+        payload = _hex_bytes(_field(data_layer, "data"))
     payload = payload or b""
 
     return {
-        "timestamp": float(packet.sniff_timestamp),
+        "timestamp": _timestamp(packet),
         "src_ip": str(ip.src),
         "dst_ip": str(ip.dst),
         "icmp_type": _integer(_field(icmp, "type")),

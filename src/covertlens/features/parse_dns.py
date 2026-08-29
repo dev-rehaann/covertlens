@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,24 @@ def _field(layer: Any, name: str) -> Any | None:
             return None
 
 
+def _nested_field(value: Any, name: str) -> Any | None:
+    fields = getattr(value, "_all_fields", value)
+    if not isinstance(fields, dict):
+        return None
+    if name in fields:
+        return fields[name]
+    for child in fields.values():
+        result = _nested_field(child, name)
+        if result is not None:
+            return result
+    return None
+
+
+def _dns_field(dns: Any, attribute: str, field_name: str) -> Any | None:
+    value = _field(dns, attribute)
+    return value if value is not None else _nested_field(dns, field_name)
+
+
 def _integer(value: Any) -> int | None:
     if value is None:
         return None
@@ -62,6 +81,15 @@ def _integer(value: Any) -> int | None:
         return None
     token = match.group()
     return int(token, 16) if token.lower().startswith("0x") else int(token)
+
+
+def _timestamp(packet: Any) -> float:
+    """Return epoch seconds across PyShark numeric and ISO timestamp formats."""
+    value = packet.sniff_timestamp
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return datetime.fromisoformat(str(value)).timestamp()
 
 
 def _qtype_name(value: Any) -> str | None:
@@ -77,6 +105,8 @@ def _qtype_name(value: Any) -> str | None:
 def _hex_bytes(value: Any) -> bytes | None:
     if value is None:
         return None
+    if isinstance(value, (list, tuple)) and value:
+        value = value[0]
     compact = str(value).replace(":", "").replace(" ", "")
     try:
         return bytes.fromhex(compact)
@@ -98,7 +128,9 @@ def _payload_bytes(packet: Any, dns: Any, query_name: str | None) -> bytes:
     # PyShark/TShark does not expose transport payload bytes consistently across
     # versions and export modes. Preserve observable DNS strings when raw bytes
     # are unavailable so later entropy code still has a documented approximation.
-    text_parts = [value for value in (query_name, _field(dns, "txt")) if value]
+    text_parts = [
+        value for value in (query_name, _dns_field(dns, "txt", "dns.txt")) if value
+    ]
     return "|".join(map(str, text_parts)).encode("utf-8", errors="replace")
 
 
@@ -109,20 +141,24 @@ def _packet_row(packet: Any) -> dict[str, Any]:
     if ip is None or transport is None:
         raise ValueError("DNS packet has no supported IP/transport layer")
 
-    query_name_value = _field(dns, "qry_name")
+    query_name_value = _dns_field(dns, "qry_name", "dns.qry.name")
     query_name = str(query_name_value) if query_name_value else None
-    is_response = _integer(_field(dns, "flags_response")) == 1
+    is_response = _integer(_dns_field(dns, "flags_response", "dns.flags.response")) == 1
 
     return {
-        "timestamp": float(packet.sniff_timestamp),
+        "timestamp": _timestamp(packet),
         "src_ip": str(ip.src),
         "dst_ip": str(ip.dst),
         "src_port": int(transport.srcport),
         "dst_port": int(transport.dstport),
         "query_name": query_name,
         "query_length": len(query_name) if query_name else 0,
-        "qtype": _qtype_name(_field(dns, "qry_type")),
-        "answer_count": _integer(_field(dns, "count_answers")) if is_response else None,
+        "qtype": _qtype_name(_dns_field(dns, "qry_type", "dns.qry.type")),
+        "answer_count": (
+            _integer(_dns_field(dns, "count_answers", "dns.count.answers"))
+            if is_response
+            else None
+        ),
         "payload_bytes": _payload_bytes(packet, dns, query_name),
         "packet_size": int(packet.length),
     }
