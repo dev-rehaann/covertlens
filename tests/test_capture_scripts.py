@@ -28,7 +28,13 @@ def test_capture_scripts() -> None:
     domains = (ROOT / "scripts" / "domains.txt").read_text().splitlines()
     targets = (ROOT / "scripts" / "ping_targets.txt").read_text().splitlines()
     assert 25 <= len(domains) <= 35
-    assert {"8.8.8.8", "1.1.1.1", "192.168.56.10"} <= set(targets)
+    assert targets == ["192.168.56.10"]
+
+    for path in [*SCRIPTS, ROOT / "scripts" / "domains.txt", ROOT / "scripts" / "ping_targets.txt"]:
+        assert b"\r\n" not in path.read_bytes()
+
+    for script in SCRIPTS:
+        assert "capinfos -c" in script.read_text()
 
     for script in SCRIPTS[2:]:
         text = script.read_text()

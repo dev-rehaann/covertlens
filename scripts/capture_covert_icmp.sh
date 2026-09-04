@@ -26,10 +26,12 @@ if [[ ! "$DURATION" =~ ^[1-9][0-9]*$ ]]; then
     exit 2
 fi
 
-command -v tshark >/dev/null 2>&1 || {
-    echo "Required command not found: tshark" >&2
-    exit 1
-}
+for command in tshark capinfos; do
+    command -v "$command" >/dev/null 2>&1 || {
+        echo "Required command not found: $command" >&2
+        exit 1
+    }
+done
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -83,7 +85,7 @@ if ((capture_status != 0)); then
 fi
 
 FILE_SIZE="$(du -h "$CAPTURE_FILE" | awk '{print $1}')"
-PACKET_COUNT="$(tshark -r "$CAPTURE_FILE" -T fields -e frame.number 2>/dev/null | wc -l)"
+PACKET_COUNT="$(capinfos -c "$CAPTURE_FILE" | awk -F: '/Number of packets/ {gsub(/[[:space:]]/, "", $2); print $2}')"
 
 printf '\nCapture complete\n'
 printf 'File: %s\n' "$CAPTURE_FILE"
