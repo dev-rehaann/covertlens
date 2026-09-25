@@ -62,6 +62,8 @@ def test_build_flow_features_for_dns_and_icmp() -> None:
     assert dns.loc[0, "duration_seconds"] == 2.0
     assert icmp.loc[0, "size_mean"] == 120.0
     assert icmp.loc[0, "duration_seconds"] == 5.0
+    assert dns.loc[0, "compression_ratio_mean"] > 0.0
+    assert icmp.loc[0, "compression_ratio_max"] > 0.0
     assert pd.isna(dns.loc[0, "icmp_size_cv"])
     assert pd.isna(icmp.loc[0, "mean_query_length"])
 

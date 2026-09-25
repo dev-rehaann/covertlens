@@ -20,10 +20,17 @@ PROTOCOL_FEATURES = {
         "size_cv",
         "interarrival_cv",
         "entropy_mean",
+        "compression_ratio_mean",
         "mean_query_length",
         "txt_null_ratio",
     ],
-    "icmp": ["size_cv", "interarrival_cv", "entropy_mean", "icmp_size_cv"],
+    "icmp": [
+        "size_cv",
+        "interarrival_cv",
+        "entropy_mean",
+        "compression_ratio_mean",
+        "icmp_size_cv",
+    ],
 }
 TWO_SIDED_FEATURES = {"size_cv", "icmp_size_cv"}
 

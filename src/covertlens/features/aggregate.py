@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from covertlens.features.entropy import shannon_entropy
+from covertlens.features.entropy import compression_ratio, shannon_entropy
 from covertlens.features.field_anomalies import (
     dns_query_anomaly_score,
     icmp_size_anomaly_score,
@@ -26,6 +26,8 @@ COLUMNS = [
     "is_single_packet_flow",
     "entropy_mean",
     "entropy_max",
+    "compression_ratio_mean",
+    "compression_ratio_max",
     "mean_query_length",
     "txt_null_ratio",
     "max_query_length",
@@ -72,6 +74,7 @@ def build_flow_features(
                 flow["timestamp"].diff().dropna()
             )
             entropies = flow["payload_bytes"].map(shannon_entropy)
+            compression_ratios = flow["payload_bytes"].map(compression_ratio)
 
             row = {
                 "flow_id": (
@@ -93,6 +96,8 @@ def build_flow_features(
                 "is_single_packet_flow": len(flow) == 1,
                 "entropy_mean": float(entropies.mean()),
                 "entropy_max": float(entropies.max()),
+                "compression_ratio_mean": float(compression_ratios.mean()),
+                "compression_ratio_max": float(compression_ratios.max()),
                 "mean_query_length": float("nan"),
                 "txt_null_ratio": float("nan"),
                 "max_query_length": float("nan"),
