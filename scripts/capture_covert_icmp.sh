@@ -15,8 +15,11 @@ case "$TOOL" in
     icmpsh)
         CLIENT_COMMAND='icmpsh.exe -t <server-ip>'
         ;;
+    hans)
+        CLIENT_COMMAND='hans -c <server-ip> -p <password>'
+        ;;
     *)
-        echo "Usage: $0 {ptunnel|icmpsh} [duration_seconds]" >&2
+        echo "Usage: $0 {ptunnel|icmpsh|hans} [duration_seconds]" >&2
         exit 2
         ;;
 esac

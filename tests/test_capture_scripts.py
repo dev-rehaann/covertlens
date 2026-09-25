@@ -44,6 +44,8 @@ def test_capture_scripts() -> None:
         result = subprocess.run([bash, bash_path(script), "invalid"], capture_output=True)
         assert result.returncode == 2
 
+    assert "hans)" in SCRIPTS[3].read_text()
+
 
 if __name__ == "__main__":
     test_capture_scripts()
