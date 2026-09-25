@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from pathlib import Path
 from typing import Callable
@@ -32,6 +33,8 @@ def build_dataset(
     manifest_path: Path = MANIFEST_PATH,
     raw_dir: Path = RAW_DIR,
     output_path: Path = FEATURES_PATH,
+    window_seconds: float = 30.0,
+    min_duration_to_split: float = 60.0,
 ) -> pd.DataFrame:
     """Process every manifested pcap, write ``features.csv``, and return it."""
     manifest = pd.read_csv(manifest_path)
@@ -52,7 +55,12 @@ def build_dataset(
             packets["protocol"] = protocol
             packets = packets.sort_values("timestamp")
             packets = assign_flow_id(packets.to_dict(orient="records"))
-            features = build_flow_features(packets, protocol)
+            features = build_flow_features(
+                packets,
+                protocol,
+                window_seconds=window_seconds,
+                min_duration_to_split=min_duration_to_split,
+            )
             features["label"] = LABELS[str(capture.condition).lower()]
             features["source_file"] = filename
             tables.append(features)
@@ -82,8 +90,15 @@ def build_dataset(
 
 def main() -> None:
     """Build the dataset using repository-default paths."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--window-seconds", type=float, default=30.0)
+    parser.add_argument("--min-duration-to-split", type=float, default=60.0)
+    args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    build_dataset()
+    build_dataset(
+        window_seconds=args.window_seconds,
+        min_duration_to_split=args.min_duration_to_split,
+    )
 
 
 if __name__ == "__main__":
