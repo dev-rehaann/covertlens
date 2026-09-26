@@ -1,9 +1,14 @@
 """PyTorch autoencoder for flow reconstruction anomaly scoring."""
 
+import logging
+
 import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+
+
+logger = logging.getLogger("covertlens.models.autoencoder_model")
 
 
 class FlowAutoencoder(nn.Module):
@@ -36,12 +41,22 @@ def train_autoencoder(
     """Train on flows believed to be mostly normal, without passing labels.
 
     We train assuming most training data is normal, consistent with real
-    deployment where covert traffic is rare. Selecting majority/baseline data
-    for training is therefore an explicit design choice and study assumption,
-    even when ground-truth labels happen to be available for later evaluation.
+    deployment where covert traffic is rare. V1 uses the full training split
+    regardless of label: clean labels would usually be unavailable in deployment.
+    This is a known simplification, not proof that a labeled lab split is mostly
+    legitimate; contamination can teach the model to reconstruct covert flows.
+    Labels remain reserved for evaluation and are never passed to this function.
     """
     if X.empty:
         raise ValueError("X must contain at least one flow")
+    if batch_size > len(X):
+        logger.warning(
+            "batch_size %d exceeds %d flows; clamping to %d",
+            batch_size,
+            len(X),
+            len(X),
+        )
+        batch_size = len(X)
 
     torch.manual_seed(random_state)
     inputs = torch.tensor(X.to_numpy(), dtype=torch.float32)
