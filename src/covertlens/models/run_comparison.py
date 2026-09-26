@@ -1,10 +1,12 @@
 """Run and compare the Phase 3 unsupervised anomaly models."""
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 from covertlens.models.autoencoder_model import reconstruction_error, train_autoencoder
 from covertlens.models.evaluate import evaluate_scores
@@ -24,13 +26,27 @@ def main() -> None:
     parser.add_argument("--protocol", choices=["dns", "icmp"])
     args = parser.parse_args()
 
-    X, y, _, _ = load_and_prepare(str(FEATURES_PATH), protocol=args.protocol)
+    X, y, feature_names, preparation_scaler = load_and_prepare(
+        str(FEATURES_PATH), protocol=args.protocol
+    )
+    # Recover the imputed raw features so evaluation uses a scaler fitted only
+    # on training rows; the convenience preprocessor fits on the whole input.
+    X = pd.DataFrame(
+        preparation_scaler.inverse_transform(X), columns=feature_names, index=X.index
+    )
     X_train, X_test, _, y_test = train_test_split(
         X,
         y,
         test_size=0.3,
         random_state=42,
         stratify=y,
+    )
+    scaler = StandardScaler()
+    X_train = pd.DataFrame(
+        scaler.fit_transform(X_train), columns=feature_names, index=X_train.index
+    )
+    X_test = pd.DataFrame(
+        scaler.transform(X_test), columns=feature_names, index=X_test.index
     )
 
     isolation_forest = train_isolation_forest(X_train)
@@ -40,8 +56,8 @@ def main() -> None:
         "Isolation Forest",
     )
 
-    # v1 simplification: train on all X_train regardless of evaluation label,
-    # assuming covert contamination is rare; revisit with baseline-only training.
+    # v1: use the full training split without label filtering. This lab dataset
+    # has a covert majority, so the mostly-normal assumption does not hold here.
     autoencoder = train_autoencoder(X_train)
     autoencoder_result = evaluate_scores(
         y_test,
@@ -50,13 +66,20 @@ def main() -> None:
     )
 
     results = pd.DataFrame([isolation_result, autoencoder_result])
+    results["protocol"] = args.protocol or "combined"
+    results["run_timestamp"] = datetime.now(timezone.utc).isoformat()
+    print(f"Protocol: {args.protocol or 'combined'}")
     print(
         results[DISPLAY_COLUMNS].to_string(
             index=False,
             float_format=lambda value: f"{value:.4f}",
         )
     )
+    print("F1 threshold selected on test labels; operating metrics are exploratory.")
+    print("Random row split can share capture sessions across train and test.")
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if RESULTS_PATH.exists():
+        results = pd.concat([pd.read_csv(RESULTS_PATH), results], ignore_index=True)
     results.to_csv(RESULTS_PATH, index=False)
     print(f"\nSaved results to {RESULTS_PATH}")
 

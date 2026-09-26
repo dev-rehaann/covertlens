@@ -16,6 +16,9 @@ def test_perfect_separation_has_unit_auc() -> None:
     assert result["f1"] == pytest.approx(1.0)
     assert result["tp"] == 2
     assert result["tn"] == 2
+    assert result["fp"] == result["fn"] == 0
+    assert result["precision"] == result["recall"] == pytest.approx(1.0)
+    assert result["model_name"] == "perfect"
 
 
 def test_no_signal_ranking_has_half_auc() -> None:

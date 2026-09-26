@@ -17,11 +17,19 @@ def evaluate_scores(
     anomaly_scores: pd.Series,
     model_name: str,
 ) -> dict:
-    """Evaluate higher-is-more-anomalous scores and select the best F1 threshold."""
+    """Evaluate higher-is-more-anomalous scores and select the best F1 threshold.
+
+    Thresholds cover score percentiles 0 through 100. The threshold uses the
+    supplied evaluation labels, so precision, recall, and F1 are exploratory
+    best-case operating metrics, not an independently calibrated deployment
+    estimate. ROC-AUC and average precision use continuous scores.
+    """
     y = np.asarray(y_true)
     scores = np.asarray(anomaly_scores)
     thresholds = np.unique(np.percentile(scores, np.arange(101)))
-    threshold = max(thresholds, key=lambda value: f1_score(y, scores >= value))
+    threshold = max(
+        thresholds, key=lambda value: f1_score(y, scores >= value, zero_division=0)
+    )
     predictions = (scores >= threshold).astype(int)
     tn, fp, fn, tp = confusion_matrix(y, predictions, labels=[0, 1]).ravel()
 
