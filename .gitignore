@@ -41,14 +41,14 @@ data/processed/*
 data/external/*
 !data/external/.gitkeep
 
-# Trained models (release artifacts are explicitly allowed)
+# Trained models and regeneratable dashboard demo artifacts
 *.pt
 *.pth
 *.pkl
 *.joblib
 *.onnx
-!models_release/
-!models_release/**
+models_release/*
+!models_release/.gitkeep
 
 # Streamlit
 .streamlit/
