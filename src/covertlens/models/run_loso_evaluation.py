@@ -3,9 +3,13 @@
 With three sessions per protocol this is only three-fold LOSO. Fold-to-fold
 variation can reveal sensitivity to session-specific conditions and must be
 reported; three sessions remain too thin for broad generalization claims.
-Sub-windows of the same session always stay together. Single-class held-out
-sessions cannot yield ROC-AUC or informative AP, so these are reported as NaN
-with valid-fold counts. More windows cannot resolve that class-coverage limit.
+Session grouping prevents leakage from correlated windowed sub-samples. Our
+capture sessions each contain one class, making every holdout single-class:
+ROC-AUC is undefined and AP cannot measure class discrimination in that fold.
+For this novelty-detection regime, report FPR on legitimate holdouts and recall
+on covert holdouts, separately. Averaging those rates together is meaningless.
+Ranking metrics remain available in the saved results for future mixed-class
+sessions; those sessions are excluded from the single-class rate summaries.
 """
 
 import argparse
@@ -59,13 +63,21 @@ def main() -> None:
         train_covert = int(y.iloc[train].eq(1).sum())
         test_legit = int(y_test.eq(0).sum())
         test_covert = int(y_test.eq(1).sum())
+        training_had_no_legit_examples = train_legit == 0
+        if test_covert == 0:
+            fold_type = "legit-holdout"
+        elif test_legit == 0:
+            fold_type = "covert-holdout"
+        else:
+            fold_type = "mixed-holdout"
         print(f"\nFold {fold_number}: {session}")
+        print(f"Fold type: {fold_type}")
         print(
             f"Train legit/covert: {train_legit}/{train_covert}; "
             f"test legit/covert: {test_legit}/{test_covert}"
         )
-        if y_test.nunique() < 2:
-            print("Single-class holdout: ROC-AUC and informative AP unavailable (NaN).")
+        if training_had_no_legit_examples:
+            print("WARNING: ZERO legitimate examples in training; normality assumption fails.")
 
         scaler = StandardScaler()
         X_train = pd.DataFrame(
@@ -95,11 +107,21 @@ def main() -> None:
                     contamination=args.contamination,
                 )
             )
+            metrics["fpr"] = (
+                metrics["fp"] / (metrics["fp"] + metrics["tn"])
+                if fold_type == "legit-holdout" else float("nan")
+            )
+            metrics["recall"] = (
+                metrics["tp"] / (metrics["tp"] + metrics["fn"])
+                if fold_type == "covert-holdout" else float("nan")
+            )
             results.append(
                 {
                     "protocol": args.protocol,
                     "run_timestamp": run_timestamp,
                     "fold": session,
+                    "fold_type": fold_type,
+                    "training_had_no_legit_examples": training_had_no_legit_examples,
                     "train_legit": train_legit,
                     "train_covert": train_covert,
                     "test_legit": test_legit,
@@ -111,18 +133,22 @@ def main() -> None:
     table = pd.DataFrame(results)
     print("\nPER-FOLD RESULTS")
     print(
-        table[["fold", "model_name", "roc_auc", "avg_precision", "tp", "fp", "tn", "fn"]]
+        table[
+            [
+                "fold", "fold_type", "model_name", "fpr", "recall",
+                "tp", "fp", "tn", "fn", "training_had_no_legit_examples",
+            ]
+        ]
         .to_string(index=False, float_format=lambda value: f"{value:.4f}")
     )
-    print("\nACROSS-FOLD SUMMARY (sample std; count = valid folds)")
-    print(
-        table.groupby("model_name")[["roc_auc", "avg_precision"]]
-        .agg(["mean", "std", "count"])
-        .to_string(float_format=lambda value: f"{value:.4f}")
-    )
-    if table["roc_auc"].notna().sum() == 0:
-        print("No valid ranking-metric folds: mean/std are unavailable, not zero.")
-        print("Use session confusion matrices; collect independent class-diverse test data.")
+    for fold_type, metric in (("legit-holdout", "fpr"), ("covert-holdout", "recall")):
+        print(f"\n{metric.upper()} SUMMARY: {fold_type} folds (sample std; count = sessions)")
+        summary = table.loc[table["fold_type"] == fold_type].groupby("model_name")[metric]
+        print(
+            summary.agg(["mean", "std", "count"])
+            .to_string(float_format=lambda value: f"{value:.4f}")
+        )
+    print("NaN rate means not applicable; std is unavailable with only one session.")
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     if RESULTS_PATH.exists():
         table = pd.concat([pd.read_csv(RESULTS_PATH), table], ignore_index=True)

@@ -2,6 +2,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from covertlens.models import run_loso_evaluation
 
@@ -48,3 +49,15 @@ def test_three_folds_keep_sessions_disjoint_and_scale_train_only(tmp_path, monke
     assert sorted(holdouts) == ["baseline.pcap"] * 2 + ["hans.pcap"] * 2 + ["ptunnel.pcap"] * 2
     assert results[["roc_auc", "avg_precision"]].isna().all().all()
     assert (results[["tp", "fp", "tn", "fn"]].sum(axis=1) == 3).all()
+    legit = results.loc[results["fold"] == "baseline.pcap"]
+    covert = results.loc[results["fold"] != "baseline.pcap"]
+    assert legit["fold_type"].eq("legit-holdout").all()
+    assert legit["fpr"].notna().all() and legit["recall"].isna().all()
+    assert legit["training_had_no_legit_examples"].all()
+    assert covert["fold_type"].eq("covert-holdout").all()
+    assert covert["recall"].notna().all() and covert["fpr"].isna().all()
+    assert not covert["training_had_no_legit_examples"].any()
+    for row in legit.itertuples():
+        assert row.fpr == pytest.approx(row.fp / (row.fp + row.tn))
+    for row in covert.itertuples():
+        assert row.recall == pytest.approx(row.tp / (row.tp + row.fn))
