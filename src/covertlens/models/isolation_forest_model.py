@@ -13,9 +13,10 @@ def train_isolation_forest(
     """Fit an Isolation Forest without using ground-truth labels.
 
     ``contamination`` is the prior assumption about what fraction of flows is
-    anomalous. That fraction is not known in a real deployment, so results are
-    sensitive to this setting; this is a genuine study limitation that should
-    be reported rather than hidden.
+    anomalous. That fraction is not known in a real deployment, so thresholded
+    predictions are sensitive to this setting; this study limitation should
+    be reported rather than hidden. It sets the decision threshold, not the
+    underlying anomaly ranking. ``n_estimators`` controls the number of trees.
     """
     model = IsolationForest(
         contamination=contamination,

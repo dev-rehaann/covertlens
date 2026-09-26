@@ -18,6 +18,11 @@ def test_outliers_receive_higher_anomaly_scores() -> None:
     scores = score_flows(model, X)
     predictions = predict_labels(model, X)
 
+    assert model.n_estimators == 200
+    assert scores.index.equals(X.index)
+    assert predictions.index.equals(X.index)
+    np.testing.assert_allclose(scores.to_numpy(), -model.decision_function(X))
+    np.testing.assert_array_equal(predictions.to_numpy(), (model.predict(X) == -1).astype(int))
     assert scores.iloc[-5:].mean() > scores.iloc[:-5].mean()
     assert scores.iloc[-5:].min() > scores.iloc[:-5].median()
     assert set(predictions) <= {0, 1}
