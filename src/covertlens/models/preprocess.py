@@ -13,16 +13,20 @@ INTERARRIVAL_COLUMNS = ["interarrival_mean", "interarrival_std", "interarrival_c
 def load_and_prepare(
     features_csv_path: str,
     protocol: str | None = None,
-) -> tuple[pd.DataFrame, pd.Series, list[str], StandardScaler]:
+) -> tuple[pd.DataFrame, pd.Series, list[str], StandardScaler, pd.Series]:
     """Load, filter, impute, and standardize model features.
 
     Labels are returned separately for evaluation only and are never included
     in the unsupervised model inputs. Missing interarrival values on a
     single-packet flow become zero because that flow has no timing variance to
     measure; this is a conservative representation rather than invented data.
+    The fifth return value is the index-aligned source-file grouping Series,
+    used only for session folds. For evaluation, recover raw imputed features
+    with the returned scaler and refit scaling on each training fold only.
     """
     features = pd.read_csv(features_csv_path)
-    missing = [column for column in ("protocol", "label") if column not in features]
+    required = ("protocol", "label", "source_file")
+    missing = [column for column in required if column not in features]
     if missing:
         raise ValueError(f"Missing required columns: {', '.join(missing)}")
 
@@ -35,6 +39,9 @@ def load_and_prepare(
             raise ValueError(f"No rows found for protocol '{protocol}'")
 
     y = pd.to_numeric(features["label"], errors="raise")
+    groups = features["source_file"].copy()
+    if groups.isna().any() or groups.astype(str).str.strip().eq("").any():
+        raise ValueError("source_file must identify a capture session for every row")
     X = features.drop(columns=METADATA_COLUMNS, errors="ignore")
     # The audit found max_query_length correlated above 0.95 with both
     # mean_query_length and size_mean. Drop it so distance-based models do not
@@ -67,4 +74,4 @@ def load_and_prepare(
         columns=feature_names,
         index=features.index,
     )
-    return X, y, feature_names, scaler
+    return X, y, feature_names, scaler, groups

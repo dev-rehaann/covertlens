@@ -1,4 +1,8 @@
-"""Run and compare the Phase 3 unsupervised anomaly models."""
+"""Exploratory, non-leak-free quick check using random row splits.
+
+Use run_loso_evaluation as the primary evaluation path for the writeup:
+this quick check shares capture sessions across training and test rows.
+"""
 
 import argparse
 from datetime import datetime, timezone
@@ -17,7 +21,10 @@ from covertlens.models.preprocess import load_and_prepare
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.csv"
 RESULTS_PATH = REPO_ROOT / "data" / "processed" / "model_comparison_results.csv"
-DISPLAY_COLUMNS = ["model_name", "roc_auc", "avg_precision", "precision", "recall", "f1"]
+DISPLAY_COLUMNS = [
+    "model_name", "roc_auc", "avg_precision", "precision", "recall", "f1",
+    "tp", "fp", "tn", "fn",
+]
 
 
 def main() -> None:
@@ -26,7 +33,7 @@ def main() -> None:
     parser.add_argument("--protocol", choices=["dns", "icmp"])
     args = parser.parse_args()
 
-    X, y, feature_names, preparation_scaler = load_and_prepare(
+    X, y, feature_names, preparation_scaler, _ = load_and_prepare(
         str(FEATURES_PATH), protocol=args.protocol
     )
     # Recover the imputed raw features so evaluation uses a scaler fitted only
@@ -54,6 +61,7 @@ def main() -> None:
         y_test,
         score_flows(isolation_forest, X_test),
         "Isolation Forest",
+        training_scores=score_flows(isolation_forest, X_train),
     )
 
     # v1: use the full training split without label filtering. This lab dataset
@@ -63,6 +71,7 @@ def main() -> None:
         y_test,
         reconstruction_error(autoencoder, X_test),
         "Autoencoder",
+        training_scores=reconstruction_error(autoencoder, X_train),
     )
 
     results = pd.DataFrame([isolation_result, autoencoder_result])
@@ -75,7 +84,7 @@ def main() -> None:
             float_format=lambda value: f"{value:.4f}",
         )
     )
-    print("F1 threshold selected on test labels; operating metrics are exploratory.")
+    print("Thresholds use the training-score 90th percentile; metrics remain exploratory.")
     print("Random row split can share capture sessions across train and test.")
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     if RESULTS_PATH.exists():

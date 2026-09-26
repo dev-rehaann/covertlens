@@ -35,11 +35,13 @@ def test_combined_protocol_preprocessing_fills_structural_nans(tmp_path: Path) -
     path = tmp_path / "features.csv"
     _write_features(path)
 
-    X, y, feature_names, scaler = load_and_prepare(str(path))
+    X, y, feature_names, scaler, groups = load_and_prepare(str(path))
 
     assert not X.isna().any().any()
     assert (X.mean().abs() < 1e-12).all()
     assert y.tolist() == [0, 1, 0, 1]
+    assert groups.tolist() == ["dns-a.pcap", "dns-b.pcap", "icmp-a.pcap", "icmp-b.pcap"]
+    assert groups.index.equals(X.index) and groups.index.equals(y.index)
     assert not {"label", "source_file", "flow_id", "protocol"}.intersection(feature_names)
     assert "max_query_length" not in feature_names
     restored = pd.DataFrame(scaler.inverse_transform(X), columns=feature_names, index=X.index)
@@ -52,11 +54,13 @@ def test_protocol_filter_drops_irrelevant_columns(tmp_path: Path) -> None:
     path = tmp_path / "features.csv"
     _write_features(path)
 
-    X, y, feature_names, _ = load_and_prepare(str(path), protocol="icmp")
+    X, y, feature_names, _, groups = load_and_prepare(str(path), protocol="icmp")
 
     assert not X.isna().any().any()
     assert (X.mean().abs() < 1e-12).all()
     assert y.tolist() == [0, 1]
+    assert groups.tolist() == ["icmp-a.pcap", "icmp-b.pcap"]
+    assert groups.index.equals(X.index) and groups.index.equals(y.index)
     assert "icmp_size_cv" in feature_names
     assert not {"mean_query_length", "txt_null_ratio", "max_query_length"}.intersection(
         feature_names
@@ -67,7 +71,7 @@ def test_dns_drops_correlated_max_query_length(tmp_path: Path) -> None:
     path = tmp_path / "features.csv"
     _write_features(path)
 
-    X, _, feature_names, _ = load_and_prepare(str(path), protocol="dns")
+    X, _, feature_names, _, _ = load_and_prepare(str(path), protocol="dns")
 
     assert not X.isna().any().any()
     assert "max_query_length" not in feature_names

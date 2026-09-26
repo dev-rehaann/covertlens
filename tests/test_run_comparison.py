@@ -13,6 +13,7 @@ def test_comparison_preserves_protocol_runs_and_scales_training_only(tmp_path, m
         {
             "protocol": ["dns"] * 20 + ["icmp"] * 20,
             "label": [0, 1] * 20,
+            "source_file": ["dns.pcap"] * 20 + ["icmp.pcap"] * 20,
             "is_single_packet_flow": False,
             "size_mean": np.arange(40, dtype=float) ** 2,
         }
