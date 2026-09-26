@@ -36,6 +36,10 @@ def load_and_prepare(
 
     y = pd.to_numeric(features["label"], errors="raise")
     X = features.drop(columns=METADATA_COLUMNS, errors="ignore")
+    # The audit found max_query_length correlated above 0.95 with both
+    # mean_query_length and size_mean. Drop it so distance-based models do not
+    # triple-count the same underlying "long query" signal.
+    X = X.drop(columns="max_query_length", errors="ignore")
     if protocol == "dns":
         X = X.drop(columns=ICMP_COLUMNS, errors="ignore")
     elif protocol == "icmp":

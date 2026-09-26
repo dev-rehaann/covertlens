@@ -41,6 +41,7 @@ def test_combined_protocol_preprocessing_fills_structural_nans(tmp_path: Path) -
     assert (X.mean().abs() < 1e-12).all()
     assert y.tolist() == [0, 1, 0, 1]
     assert not {"label", "source_file", "flow_id", "protocol"}.intersection(feature_names)
+    assert "max_query_length" not in feature_names
     restored = pd.DataFrame(scaler.inverse_transform(X), columns=feature_names, index=X.index)
     assert abs(restored.loc[0, "interarrival_mean"]) < 1e-12
     assert abs(restored.loc[0, "icmp_size_cv"]) < 1e-12
@@ -60,3 +61,14 @@ def test_protocol_filter_drops_irrelevant_columns(tmp_path: Path) -> None:
     assert not {"mean_query_length", "txt_null_ratio", "max_query_length"}.intersection(
         feature_names
     )
+
+
+def test_dns_drops_correlated_max_query_length(tmp_path: Path) -> None:
+    path = tmp_path / "features.csv"
+    _write_features(path)
+
+    X, _, feature_names, _ = load_and_prepare(str(path), protocol="dns")
+
+    assert not X.isna().any().any()
+    assert "max_query_length" not in feature_names
+    assert {"mean_query_length", "size_mean"}.issubset(feature_names)
