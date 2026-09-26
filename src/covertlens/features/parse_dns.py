@@ -11,7 +11,6 @@ from typing import Any
 import pandas as pd
 import pyshark
 
-
 logger = logging.getLogger("covertlens.features.parse_dns")
 
 COLUMNS = [
@@ -128,9 +127,7 @@ def _payload_bytes(packet: Any, dns: Any, query_name: str | None) -> bytes:
     # PyShark/TShark does not expose transport payload bytes consistently across
     # versions and export modes. Preserve observable DNS strings when raw bytes
     # are unavailable so later entropy code still has a documented approximation.
-    text_parts = [
-        value for value in (query_name, _dns_field(dns, "txt", "dns.txt")) if value
-    ]
+    text_parts = [value for value in (query_name, _dns_field(dns, "txt", "dns.txt")) if value]
     return "|".join(map(str, text_parts)).encode("utf-8", errors="replace")
 
 
@@ -155,13 +152,26 @@ def _packet_row(packet: Any) -> dict[str, Any]:
         "query_length": len(query_name) if query_name else 0,
         "qtype": _qtype_name(_dns_field(dns, "qry_type", "dns.qry.type")),
         "answer_count": (
-            _integer(_dns_field(dns, "count_answers", "dns.count.answers"))
-            if is_response
-            else None
+            _integer(_dns_field(dns, "count_answers", "dns.count.answers")) if is_response else None
         ),
         "payload_bytes": _payload_bytes(packet, dns, query_name),
         "packet_size": int(packet.length),
     }
+
+
+def _close_capture(capture: Any) -> None:
+    """Finish cleanup even when PyShark re-raises an exited TShark error."""
+    try:
+        capture.close()
+    except Exception:
+        # PyShark retains crashed, already-exited processes in this private set.
+        # Remove only exited processes, finish cleanup, and preserve the error;
+        # otherwise its destructor retries after the worker's loop is closed.
+        capture._running_processes.difference_update(
+            {process for process in capture._running_processes if process.returncode is not None}
+        )
+        capture.close()
+        raise
 
 
 def extract_dns_packet_metadata(pcap_path: str) -> pd.DataFrame:
@@ -188,15 +198,13 @@ def extract_dns_packet_metadata(pcap_path: str) -> pd.DataFrame:
                     pcap_path,
                     error,
                 )
-    except Exception as error:  # noqa: BLE001 - return rows parsed before a TShark failure.
-        logger.error(
-            "Stopped reading DNS capture %s after %d rows: %s",
+    except Exception:  # Return rows parsed before a TShark failure.
+        logger.exception(
+            "Stopped reading DNS capture %s after %d rows",
             pcap_path,
             len(rows),
-            error,
-            exc_info=True,
         )
     finally:
-        capture.close()
+        _close_capture(capture)
 
     return pd.DataFrame(rows, columns=COLUMNS)

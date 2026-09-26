@@ -12,6 +12,16 @@ from sklearn.metrics import (
 )
 
 
+def training_score_threshold(training_scores: pd.Series, contamination: float = 0.1) -> float:
+    """Calibrate an anomaly threshold from training scores only, never test/upload scores."""
+    training = np.asarray(training_scores, dtype=float)
+    if training.ndim != 1 or not len(training) or not np.isfinite(training).all():
+        raise ValueError("training_scores must be a nonempty finite vector")
+    if not 0 < contamination <= 0.5:
+        raise ValueError("contamination must be in (0, 0.5]")
+    return float(np.percentile(training, 100 * (1 - contamination)))
+
+
 def evaluate_scores_no_threshold(
     y_true: pd.Series, anomaly_scores: pd.Series, model_name: str
 ) -> dict:
@@ -61,12 +71,7 @@ def evaluate_scores(
     """
     metrics = evaluate_scores_no_threshold(y_true, anomaly_scores, model_name)
     if threshold is None:
-        training = np.asarray(training_scores, dtype=float)
-        if training.ndim != 1 or not len(training) or not np.isfinite(training).all():
-            raise ValueError("training_scores must be a nonempty finite vector")
-        if not 0 < contamination <= 0.5:
-            raise ValueError("contamination must be in (0, 0.5]")
-        threshold = float(np.percentile(training, 100 * (1 - contamination)))
+        threshold = training_score_threshold(training_scores, contamination)
         threshold_source = "training_percentile"
     else:
         if training_scores is not None or not np.isfinite(threshold):

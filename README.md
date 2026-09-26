@@ -12,7 +12,7 @@ covertlens studies detection through side-channel statistics: packet-size distri
 
 The current phase targets DNS and ICMP traffic only. The architecture is intended to support later research on other protocols and observable channels, including TLS SNI, NTP, and HTTP/2 timing, but these are future work rather than current capabilities.
 
-Repository setup, isolated-lab data collection, the feature pipeline, and initial modeling/evaluation are implemented (Phases 0–3). The FastAPI/Streamlit dashboard is planned for Phase 4 and is not yet implemented. Lab validation uses Iodine and dnscat2 for DNS, and ptunnel and Hans for ICMP; the attempted icmpsh/Wine path was abandoned.
+Repository setup, isolated-lab data collection, the feature pipeline, and initial modeling/evaluation are implemented (Phases 0–3). Phase 4 now includes a FastAPI results/scoring backend; the Streamlit frontend is still planned. Lab validation uses Iodine and dnscat2 for DNS, and ptunnel and Hans for ICMP; the attempted icmpsh/Wine path was abandoned.
 
 ## Why this approach
 
@@ -42,7 +42,10 @@ flowchart LR
     D --> F[Autoencoder]
     E --> G[Anomaly score]
     F --> G
-    G --> H[FastAPI / Streamlit dashboard - planned]
+    G --> H[FastAPI live-demo scoring API]
+    R[Saved LOSO results] --> V[FastAPI results API]
+    H --> K[Streamlit dashboard - planned]
+    V --> K
 ```
 
 ## Repository structure
@@ -79,6 +82,21 @@ python -m covertlens.models.run_loso_evaluation --protocol icmp
 
 Raw captures, manifests, features, and generated evaluation results stay local and gitignored. The repository does not ship the lab dataset. `python scripts/compare_baseline_sessions.py` provides an additional DNS baseline-session diagnostic.
 
+### Local results and live-scoring API
+
+Generate the full-data demo artifacts and run the API on localhost:
+
+```bash
+python -m covertlens.models.train_final
+python -m uvicorn covertlens.dashboard.api:app --host 127.0.0.1 --port 8000
+```
+
+- `GET /` — health status and the live-demo warning.
+- `GET /results/dns` or `/results/icmp` — latest saved LOSO run for that protocol, per-fold results, and separate FPR/recall summaries. Historical runs are not pooled; unavailable metrics are JSON `null`.
+- `POST /score?protocol=dns` or `icmp` — upload a `.pcap`/`.pcapng` as multipart field `file` (maximum 50 MiB). Returns per-flow/window timestamps, packet counts, both anomaly scores, and `flagged_by_either` at the saved training-score 90th-percentile thresholds.
+
+The scoring response carries `X-Covertlens-Evidence` and `X-Covertlens-Warning` headers: it is a **full-data live demo, not LOSO evidence**. Upload scores never recalibrate thresholds. Temporary capture files are removed after processing, including failures. This unauthenticated research API is for local/authorized lab use, not public deployment; load only trusted, locally generated model artifacts. Models and feature-name files are regeneratable and gitignored. Rerun `train_final` if older artifacts lack saved thresholds.
+
 ### Evaluation and initial findings
 
 The primary evaluation is leave-one-session-out (LOSO), grouped by the original `source_file`, with scaling fitted on each training fold only. Non-overlapping windows from the same capture stay together to avoid session leakage. `run_comparison.py` remains an exploratory random-row quick check, not the evaluation used for research claims.
@@ -108,5 +126,5 @@ MIT License, see [LICENSE](LICENSE) file.
 - [x] Phase 2 — Feature pipeline with long-flow windowing
 - [x] Phase 3 — Initial modeling and session-grouped evaluation
 - [ ] Additional independent capture sessions and broader validation
-- [ ] Phase 4 — FastAPI / Streamlit dashboard
+- [ ] Phase 4 — Results dashboard *(FastAPI backend implemented; Streamlit frontend pending)*
 - [ ] Phase 5 — Adversarial hardening *(stretch)*

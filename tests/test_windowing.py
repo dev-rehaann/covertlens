@@ -16,10 +16,7 @@ def test_splits_long_flow_and_preserves_short_flow() -> None:
 
     assert len(windows) == 5
     assert [len(window) for window in windows] == [15, 15, 15, 15, 16]
-    assert all(
-        window["timestamp"].max() - window["timestamp"].min() <= 30.0
-        for window in windows
-    )
+    assert all(window["timestamp"].max() - window["timestamp"].min() <= 30.0 for window in windows)
 
     short_flow = long_flow[long_flow["timestamp"] <= 10.0]
     short_result = split_long_flow(short_flow)
@@ -40,6 +37,9 @@ def test_aggregate_suffixes_long_flow_windows() -> None:
 
     features = build_flow_features(packets, "icmp")
 
-    assert features["flow_id"].tolist() == [
-        f"flow_12_w{index}" for index in range(5)
-    ]
+    assert features["flow_id"].tolist() == [f"flow_12_w{index}" for index in range(5)]
+    assert "start_timestamp" not in features
+    timestamped = build_flow_features(packets, "icmp", include_timestamps=True)
+    assert timestamped["start_timestamp"].tolist() == [0.0, 30.0, 60.0, 90.0, 120.0]
+    assert timestamped["end_timestamp"].tolist() == [28.0, 58.0, 88.0, 118.0, 150.0]
+    assert timestamped.drop(columns=["start_timestamp", "end_timestamp"]).equals(features)

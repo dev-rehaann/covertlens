@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 
 from covertlens.models.autoencoder_model import FlowAutoencoder, reconstruction_error
+from covertlens.models.evaluate import training_score_threshold
 from covertlens.models.isolation_forest_model import score_flows
 from covertlens.models.preprocess import load_and_prepare
 from covertlens.models.train_final import DEMO_WARNING, train_final
@@ -68,6 +69,9 @@ def test_final_artifacts_round_trip_for_both_protocols(tmp_path: Path, capsys) -
         restored_X = pd.DataFrame(scaler.transform(raw), columns=names, index=X.index)
         np.testing.assert_allclose(restored_X, X)
         assert np.isfinite(score_flows(forest, restored_X)).all()
+        assert forest.anomaly_threshold_ == training_score_threshold(
+            score_flows(forest, restored_X)
+        )
 
         autoencoder = FlowAutoencoder(checkpoint["input_dim"])
         autoencoder.load_state_dict(checkpoint["state_dict"])
@@ -75,6 +79,7 @@ def test_final_artifacts_round_trip_for_both_protocols(tmp_path: Path, capsys) -
         errors = reconstruction_error(autoencoder, restored_X)
         assert len(errors) == len(X)
         assert np.isfinite(errors).all() and errors.ge(0).all()
+        assert checkpoint["anomaly_threshold"] == training_score_threshold(errors)
 
     stdout = capsys.readouterr().out
     assert stdout.count(DEMO_WARNING) == 4

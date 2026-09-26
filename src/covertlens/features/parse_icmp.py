@@ -15,13 +15,13 @@ import pandas as pd
 import pyshark
 
 from covertlens.features.parse_dns import (
+    _close_capture,
     _field,
     _hex_bytes,
     _integer,
     _nested_field,
     _timestamp,
 )
-
 
 logger = logging.getLogger("covertlens.features.parse_icmp")
 
@@ -88,15 +88,13 @@ def extract_icmp_packet_metadata(pcap_path: str) -> pd.DataFrame:
                     pcap_path,
                     error,
                 )
-    except Exception as error:  # noqa: BLE001 - return rows parsed before a TShark failure.
-        logger.error(
-            "Stopped reading ICMP capture %s after %d rows: %s",
+    except Exception:  # Return rows parsed before a TShark failure.
+        logger.exception(
+            "Stopped reading ICMP capture %s after %d rows",
             pcap_path,
             len(rows),
-            error,
-            exc_info=True,
         )
     finally:
-        capture.close()
+        _close_capture(capture)
 
     return pd.DataFrame(rows, columns=COLUMNS)

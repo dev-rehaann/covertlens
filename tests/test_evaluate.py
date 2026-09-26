@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from covertlens.models.evaluate import evaluate_scores, evaluate_scores_no_threshold
+from covertlens.models.evaluate import (
+    evaluate_scores,
+    evaluate_scores_no_threshold,
+    training_score_threshold,
+)
 
 
 def test_perfect_separation_has_unit_auc() -> None:
@@ -67,3 +71,14 @@ def test_fixed_probability_threshold_is_not_fit_to_test_labels():
         evaluate_scores(
             pd.Series([0, 1]), scores, "reference", threshold=0.5, training_scores=scores
         )
+
+
+@pytest.mark.parametrize("scores", [[], [float("nan")], [float("inf")]])
+def test_training_threshold_rejects_invalid_scores(scores):
+    with pytest.raises(ValueError, match="nonempty finite vector"):
+        training_score_threshold(pd.Series(scores, dtype=float))
+
+
+def test_training_threshold_rejects_invalid_contamination():
+    with pytest.raises(ValueError, match="contamination"):
+        training_score_threshold(pd.Series([0.1, 0.2]), contamination=0.0)

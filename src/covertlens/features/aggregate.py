@@ -11,7 +11,6 @@ from covertlens.features.field_anomalies import (
 )
 from covertlens.features.windowing import split_long_flow
 
-
 COLUMNS = [
     "flow_id",
     "protocol",
@@ -48,6 +47,7 @@ def build_flow_features(
     protocol: str,
     window_seconds: float = 30.0,
     min_duration_to_split: float = 60.0,
+    include_timestamps: bool = False,
 ) -> pd.DataFrame:
     """Return one aggregated feature row per short flow or long-flow window.
 
@@ -55,6 +55,8 @@ def build_flow_features(
     side channels. DNS query shape and ICMP payload-size variation add the
     protocol mechanics most associated with each tunnel family. Long continuous
     flows are subdivided into non-overlapping windows before aggregation.
+    Optional start/end timestamps describe each actual window for the dashboard;
+    they are omitted by default so they do not become numeric model inputs.
     """
     protocol = protocol.lower()
     if protocol not in {"dns", "icmp"}:
@@ -63,9 +65,7 @@ def build_flow_features(
     rows: list[dict[str, Any]] = []
     for flow_id, original_flow in packet_df.groupby("flow_id", sort=False):
         original_flow = original_flow.sort_values("timestamp")
-        duration = float(
-            original_flow["timestamp"].max() - original_flow["timestamp"].min()
-        )
+        duration = float(original_flow["timestamp"].max() - original_flow["timestamp"].min())
         windows = split_long_flow(original_flow, window_seconds, min_duration_to_split)
 
         for window_index, flow in enumerate(windows):
@@ -78,15 +78,11 @@ def build_flow_features(
 
             row = {
                 "flow_id": (
-                    f"{flow_id}_w{window_index}"
-                    if duration >= min_duration_to_split
-                    else flow_id
+                    f"{flow_id}_w{window_index}" if duration >= min_duration_to_split else flow_id
                 ),
                 "protocol": protocol,
                 "packet_count": len(flow),
-                "duration_seconds": float(
-                    flow["timestamp"].max() - flow["timestamp"].min()
-                ),
+                "duration_seconds": float(flow["timestamp"].max() - flow["timestamp"].min()),
                 "size_mean": size_mean,
                 "size_std": size_std,
                 "size_cv": size_cv,
@@ -108,6 +104,10 @@ def build_flow_features(
                 row.update(dns_query_anomaly_score(flow["query_length"], flow["qtype"]))
             else:
                 row["icmp_size_cv"] = icmp_size_anomaly_score(flow["payload_length"])
+            if include_timestamps:
+                row["start_timestamp"] = float(flow["timestamp"].min())
+                row["end_timestamp"] = float(flow["timestamp"].max())
             rows.append(row)
 
-    return pd.DataFrame(rows, columns=COLUMNS)
+    columns = [*COLUMNS, "start_timestamp", "end_timestamp"] if include_timestamps else COLUMNS
+    return pd.DataFrame(rows, columns=columns)

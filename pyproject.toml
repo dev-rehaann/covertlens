@@ -21,6 +21,7 @@ dependencies = [
     "pandas",
     "numpy",
     "fastapi",
+    "python-multipart",
     "uvicorn",
     "streamlit",
     "pydantic",
@@ -30,6 +31,7 @@ dependencies = [
 reference = ["xgboost>=3.0,<4"]
 dev = [
     "pytest",
+    "httpx",
     "black",
     "ruff",
     "mypy",
