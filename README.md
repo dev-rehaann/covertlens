@@ -57,7 +57,9 @@ flowchart LR
 - `docs/` — [isolated-lab setup](docs/lab-setup.md), [Phase 0–3 findings and methodology notes](docs/notes.md), and literature-review notes.
 - `scripts/` — one-off repository setup and isolated-lab support scripts.
 
-## Setup
+## Setup instructions
+
+### Environment setup
 
 Use Python 3.11+ and install the package from the repository root:
 
@@ -67,35 +69,47 @@ python -m pip install -e .
 
 For development tools, use `python -m pip install -e ".[dev]"`. The optional supervised XGBoost reference requires `python -m pip install -e ".[reference]"` (or `".[dev,reference]"` for both).
 
-Install TShark separately at the OS level and make sure `tshark -v` works in the processing environment; pyshark is a wrapper and does not install TShark. See [requirements-lab.txt](requirements-lab.txt) for non-Python tools and [docs/lab-setup.md](docs/lab-setup.md) before any lab capture. Tunnel-tool installation and configuration remain manual.
+Install TShark separately at the OS level; pyshark is a wrapper and does not install it:
 
-With authorized lab captures in `data/raw/`, run:
+- **Windows:** install [Wireshark with its TShark component](https://www.wireshark.org/docs/wsug_html_chunked/ChBuildInstallWinInstall.html). Add the installation directory (typically `C:\Program Files\Wireshark`) to `PATH` if `tshark` is not found.
+- **Linux:** install your distribution's TShark/Wireshark package through its package manager. Package names vary; see the [official installation guide](https://www.wireshark.org/docs/wsug_html_chunked/ChapterBuildInstall.html).
+- **macOS:** install the official [Wireshark disk image](https://www.wireshark.org/download.html) and its command-line path support; see the [macOS installation guide](https://www.wireshark.org/docs/wsug_html_chunked/ChBuildInstallOSXInstall.html).
+
+Open a fresh terminal and verify `tshark -v` succeeds before processing captures. See [requirements-lab.txt](requirements-lab.txt) for non-Python tools and [docs/lab-setup.md](docs/lab-setup.md) before any lab capture. Tunnel-tool installation and configuration remain manual; tunnel tools are not needed just to view existing results.
+
+### Full pipeline from scratch
+
+From the repository root, with authorized, correctly named lab captures in `data/raw/`, run in this order:
 
 ```bash
 python -m covertlens.capture.manifest
 python -m covertlens.features.build_dataset --window-seconds 30 --min-duration-to-split 60
-python scripts/inspect_features.py
-python scripts/audit_dataset.py
 python -m covertlens.models.run_loso_evaluation --protocol dns
 python -m covertlens.models.run_loso_evaluation --protocol icmp
-```
-
-Raw captures, manifests, features, and generated evaluation results stay local and gitignored. The repository does not ship the lab dataset. `python scripts/compare_baseline_sessions.py` provides an additional DNS baseline-session diagnostic.
-
-### Local results and live-scoring API
-
-Generate the full-data demo artifacts and run the API on localhost:
-
-```bash
 python -m covertlens.models.train_final
-python -m uvicorn covertlens.dashboard.api:app --host 127.0.0.1 --port 8000
 ```
 
-In a second terminal, start the dashboard:
+The manifest inventories the pcaps; `build_dataset` writes the flow/window features; LOSO evaluation writes the credible per-session results; `train_final` then saves the separate full-data demo models, scaler, feature order, and training-score thresholds. Run LOSO separately for both protocols so both dashboard selectors have results. LOSO requires at least two source sessions per protocol; substantially more independent sessions are needed for reliable findings. Final training requires flows for both protocols.
+
+Optional diagnostics after feature extraction are `python scripts/inspect_features.py` and `python scripts/audit_dataset.py`; `python scripts/compare_baseline_sessions.py` compares DNS baseline sessions. Raw captures, manifests, features, generated evaluation results, and trained models stay local and gitignored. The repository does not ship the lab dataset or demo artifacts.
+
+### Run the dashboard locally
+
+After the pipeline completes, keep two terminals open at the repository root. Terminal 1 starts the FastAPI backend on localhost:
 
 ```bash
-python -m streamlit run src/covertlens/dashboard/app.py --server.address 127.0.0.1 --server.port 8501
+uvicorn covertlens.dashboard.api:app --reload --port 8000
 ```
+
+Terminal 2 starts the Streamlit frontend (explicitly bound to localhost):
+
+```bash
+streamlit run src/covertlens/dashboard/app.py --server.address 127.0.0.1
+```
+
+Open `http://localhost:8501` in your browser. If the console commands are not on `PATH`, use `python -m uvicorn` and `python -m streamlit` respectively with the same arguments. `--reload` is for local development, not deployment.
+
+**Evidence distinction:** Evaluation Results presents the credible Phase 3 LOSO findings on held-out lab sessions, with the small session counts and limitations visible. Live Scoring Demo is illustrative only: its final models were trained on 100% of available flows with nothing held out. Its flags are not equivalent evaluation evidence or proof of a covert channel. See [docs/notes.md](docs/notes.md) for the LOSO methodology and limitations.
 
 The dashboard uses `http://localhost:8000` by default; set `COVERTLENS_API_URL` before launching to change the backend address. Use only a trusted local/lab backend: uploads send capture bytes to that address. Evaluation Results shows per-session LOSO tables and grouped FPR/recall bars with session counts. Live Scoring Demo displays its full-data-model warning before the upload controls, text-labeled flags, and a per-flow score scatter chart. Uploads are scored automatically; successful results stay in that browser session to avoid duplicate scoring on widget reruns.
 
