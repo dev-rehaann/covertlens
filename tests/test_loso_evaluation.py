@@ -41,12 +41,25 @@ def test_three_folds_keep_sessions_disjoint_and_scale_train_only(tmp_path, monke
     monkeypatch.setattr(run_loso_evaluation, "train_autoencoder", fake_train)
     monkeypatch.setattr(run_loso_evaluation, "score_flows", fake_score)
     monkeypatch.setattr(run_loso_evaluation, "reconstruction_error", fake_score)
+
+    def fake_supervised_train(X, y):
+        assert y.equals(features.loc[X.index, "label"])
+        assert set(y) == {0, 1}
+        return fake_train(X)
+
+    monkeypatch.setattr(run_loso_evaluation, "train_xgboost", fake_supervised_train)
+    monkeypatch.setattr(run_loso_evaluation, "score_xgboost", fake_score, raising=False)
     run_loso_evaluation.main()
 
     results = pd.read_csv(results_path)
     assert results["fold"].nunique() == 3
-    assert results.groupby("fold").size().tolist() == [2, 2, 2]
-    assert sorted(holdouts) == ["baseline.pcap"] * 2 + ["hans.pcap"] * 2 + ["ptunnel.pcap"] * 2
+    assert results.groupby("fold").size().tolist() == [2, 3, 3]
+    assert sorted(holdouts) == ["baseline.pcap"] * 2 + ["hans.pcap"] * 3 + ["ptunnel.pcap"] * 3
+    supervised = results.loc[results["model_name"] == run_loso_evaluation.XGBOOST_NAME]
+    assert supervised["uses_training_labels"].all()
+    assert supervised["scale_pos_weight"].eq(1.0).all()
+    assert supervised["threshold"].eq(0.5).all()
+    assert supervised["threshold_source"].eq("fixed").all()
     assert results[["roc_auc", "avg_precision"]].isna().all().all()
     assert (results[["tp", "fp", "tn", "fn"]].sum(axis=1) == 3).all()
     legit = results.loc[results["fold"] == "baseline.pcap"]

@@ -27,6 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+reference = ["xgboost>=3.0,<4"]
 dev = [
     "pytest",
     "black",

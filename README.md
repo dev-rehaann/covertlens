@@ -55,6 +55,13 @@ flowchart LR
 
 **Coming in Phase 0.2.** Installation and environment instructions will be added after `requirements.txt` or `pyproject.toml` defines the project dependencies.
 
+The optional supervised reference requires `pip install -e ".[reference]"`.
+Run `python -m covertlens.models.run_loso_evaluation --protocol dns` (or `icmp`)
+for session-grouped evaluation. XGBoost uses training labels and a fixed 0.5
+probability threshold; Isolation Forest and the Autoencoder do not use training
+labels and retain training-score percentile thresholds. The supervised reference
+is not a like-for-like comparison or a guaranteed performance upper bound.
+
 ## Ethical use & research disclaimer
 
 covertlens is intended solely for defensive security research. Any tunneling tools used for validation—including Iodine, dnscat2, ptunnel, and icmpsh—must be run only in isolated lab virtual machines that are never connected to production networks. This repository does not include or distribute tunnel-building or exploit code.

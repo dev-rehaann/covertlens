@@ -1,4 +1,4 @@
-"""Continuous-score metrics and thresholds calibrated on training scores only."""
+"""Continuous-score metrics with training-calibrated or predeclared thresholds."""
 
 import numpy as np
 import pandas as pd
@@ -44,8 +44,9 @@ def evaluate_scores(
     anomaly_scores: pd.Series,
     model_name: str,
     *,
-    training_scores: pd.Series,
+    training_scores: pd.Series | None = None,
     contamination: float = 0.1,
+    threshold: float | None = None,
 ) -> dict:
     """Evaluate using the training-score (1-contamination) percentile threshold.
 
@@ -53,21 +54,35 @@ def evaluate_scores(
     scores calibrate the threshold. Apply the same anomaly-fraction prior to
     both model families. Always return the full confusion matrix, including
     when the held-out session contains a single class.
+
+    A predeclared fixed threshold is also supported for supervised probability
+    scores (0.5 for the XGBoost reference). It must not be chosen from test
+    labels/scores; do not pass training_scores together with a fixed threshold.
     """
     metrics = evaluate_scores_no_threshold(y_true, anomaly_scores, model_name)
-    training = np.asarray(training_scores, dtype=float)
-    if training.ndim != 1 or not len(training) or not np.isfinite(training).all():
-        raise ValueError("training_scores must be a nonempty finite vector")
-    if not 0 < contamination <= 0.5:
-        raise ValueError("contamination must be in (0, 0.5]")
-    threshold = float(np.percentile(training, 100 * (1 - contamination)))
+    if threshold is None:
+        training = np.asarray(training_scores, dtype=float)
+        if training.ndim != 1 or not len(training) or not np.isfinite(training).all():
+            raise ValueError("training_scores must be a nonempty finite vector")
+        if not 0 < contamination <= 0.5:
+            raise ValueError("contamination must be in (0, 0.5]")
+        threshold = float(np.percentile(training, 100 * (1 - contamination)))
+        threshold_source = "training_percentile"
+    else:
+        if training_scores is not None or not np.isfinite(threshold):
+            raise ValueError("A fixed finite threshold must be provided without training_scores")
+        threshold = float(threshold)
+        threshold_source = "fixed"
     predictions = (np.asarray(anomaly_scores) >= threshold).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_true, predictions, labels=[0, 1]).ravel()
 
     return {
         **metrics,
         "threshold": threshold,
-        "contamination": contamination,
+        "threshold_source": threshold_source,
+        "contamination": (
+            contamination if threshold_source == "training_percentile" else float("nan")
+        ),
         "precision": float(precision_score(y_true, predictions, zero_division=0)),
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "f1": float(f1_score(y_true, predictions, zero_division=0)),
