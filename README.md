@@ -12,7 +12,7 @@ covertlens studies detection through side-channel statistics: packet-size distri
 
 The current phase targets DNS and ICMP traffic only. The architecture is intended to support later research on other protocols and observable channels, including TLS SNI, NTP, and HTTP/2 timing, but these are future work rather than current capabilities.
 
-Repository setup, isolated-lab data collection, the feature pipeline, and initial modeling/evaluation are implemented (Phases 0–3). Phase 4 now includes a FastAPI results/scoring backend; the Streamlit frontend is still planned. Lab validation uses Iodine and dnscat2 for DNS, and ptunnel and Hans for ICMP; the attempted icmpsh/Wine path was abandoned.
+Repository setup, isolated-lab data collection, the feature pipeline, and initial modeling/evaluation are implemented (Phases 0–3). Phase 4 includes a FastAPI results/scoring backend and a two-tab Streamlit dashboard separating LOSO findings from the full-data live demo. Lab validation uses Iodine and dnscat2 for DNS, and ptunnel and Hans for ICMP; the attempted icmpsh/Wine path was abandoned.
 
 ## Why this approach
 
@@ -44,7 +44,7 @@ flowchart LR
     F --> G
     G --> H[FastAPI live-demo scoring API]
     R[Saved LOSO results] --> V[FastAPI results API]
-    H --> K[Streamlit dashboard - planned]
+    H --> K[Streamlit dashboard - separate evidence / demo tabs]
     V --> K
 ```
 
@@ -91,6 +91,14 @@ python -m covertlens.models.train_final
 python -m uvicorn covertlens.dashboard.api:app --host 127.0.0.1 --port 8000
 ```
 
+In a second terminal, start the dashboard:
+
+```bash
+python -m streamlit run src/covertlens/dashboard/app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+The dashboard uses `http://localhost:8000` by default; set `COVERTLENS_API_URL` before launching to change the backend address. Use only a trusted local/lab backend: uploads send capture bytes to that address. Evaluation Results shows per-session LOSO tables and grouped FPR/recall bars with session counts. Live Scoring Demo displays its full-data-model warning before the upload controls, text-labeled flags, and a per-flow score scatter chart. Uploads are scored automatically; successful results stay in that browser session to avoid duplicate scoring on widget reruns.
+
 - `GET /` — health status and the live-demo warning.
 - `GET /results/dns` or `/results/icmp` — latest saved LOSO run for that protocol, per-fold results, and separate FPR/recall summaries. Historical runs are not pooled; unavailable metrics are JSON `null`.
 - `POST /score?protocol=dns` or `icmp` — upload a `.pcap`/`.pcapng` as multipart field `file` (maximum 50 MiB). Returns per-flow/window timestamps, packet counts, both anomaly scores, and `flagged_by_either` at the saved training-score 90th-percentile thresholds.
@@ -126,5 +134,5 @@ MIT License, see [LICENSE](LICENSE) file.
 - [x] Phase 2 — Feature pipeline with long-flow windowing
 - [x] Phase 3 — Initial modeling and session-grouped evaluation
 - [ ] Additional independent capture sessions and broader validation
-- [ ] Phase 4 — Results dashboard *(FastAPI backend implemented; Streamlit frontend pending)*
+- [x] Phase 4 — Initial local results dashboard and live-scoring demo
 - [ ] Phase 5 — Adversarial hardening *(stretch)*

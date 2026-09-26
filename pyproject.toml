@@ -24,6 +24,7 @@ dependencies = [
     "python-multipart",
     "uvicorn",
     "streamlit",
+    "requests",
     "pydantic",
 ]
 
