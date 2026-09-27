@@ -67,6 +67,29 @@ The results tab reads the latest saved LOSO run per protocol. The live tab appli
 
 ## 4. Anything extra
 
+### Live-demo flag rate versus LOSO recall
+
+The reported smoke test of the lab Iodine capture flagged **55/164 flows
+(33.5%)** in the Live Scoring Demo, compared with held-out Iodine LOSO recall
+of **76.8% for Isolation Forest** and **84.2% for the Autoencoder**. The demo
+count uses the combined `flagged_by_either` rule; the LOSO figures are
+individual-model recall, not the same statistic.
+
+A likely contributor is training composition and calibration: the final DNS
+models include every session, with 269/837 flows (about 32%) labeled covert
+in the inventory, though labels are not passed to the unsupervised trainers.
+Their thresholds are the 90th percentiles of scores on that full training
+pool. In the Iodine LOSO fold, the entire Iodine session is absent, and both
+scaling and thresholds are fitted using only the remaining sessions. Including
+known tunnel behavior can make it less anomalous to the final models and shift
+their calibration, lowering the flag rate. This is a plausible explanation,
+not a causal result established by a controlled retraining experiment.
+
+**Never compare live-demo flag counts/rates directly with LOSO recall or FPR.**
+They measure different things under different training conditions. The demo
+is illustrative full-data scoring, not held-out performance; this discrepancy
+does not invalidate or replace the LOSO findings.
+
 - **Real limitation:** only 2 covert sessions per protocol. Fold-to-fold recall variance signals limited tool diversity, not proof of full generalization.
 - **Deferred, not abandoned:** window-concatenated compression ratio as a possible ICMP refinement; more independent baseline/covert sessions; GAN-based adversarial hardening stretch goal. The live Wireshark Lua plugin was cut early in favor of the now-implemented dashboard.
 - **Dead end worth documenting:** icmpsh's Windows-only slave under Wine — unreliable raw-socket emulation, replaced with Hans.

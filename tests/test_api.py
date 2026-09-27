@@ -173,6 +173,12 @@ def test_score_synthetic_pcap(protocol, suffix, final_models, tmp_path, monkeypa
             )
             packet.time = 1000.0 + index * 10
             packets.append(packet)
+        # Mix a short flow with windowed flows to catch inconsistent JSON ID types.
+        short_packet = (
+            scapy.IP(src="10.0.0.3", dst="10.0.0.1") / scapy.ICMP(type=8) / scapy.Raw(b"short flow")
+        )
+        short_packet.time = 1100.0
+        packets.append(short_packet)
     path = tmp_path / f"synthetic_{protocol}{suffix}"
     if suffix == ".pcapng":
         with scapy.PcapNgWriter(str(path)) as writer:
@@ -196,11 +202,12 @@ def test_score_synthetic_pcap(protocol, suffix, final_models, tmp_path, monkeypa
     assert response.headers["X-Covertlens-Evidence"] == "full-data-live-demo-not-LOSO"
     assert response.headers["X-Covertlens-Warning"] == DEMO_WARNING
     body = response.json()
-    assert len(body) == (2 if protocol == "dns" else 3)
+    assert len(body) == (2 if protocol == "dns" else 4)
     assert sum(row["packet_count"] for row in body) == len(packets)
     forest = joblib.load(final_models / f"{protocol}_isolation_forest.joblib")
     checkpoint = torch.load(final_models / f"{protocol}_autoencoder.pt", weights_only=True)
     for row in body:
+        assert isinstance(row["flow_id"], str)
         assert set(row) == {
             "flow_id",
             "start_timestamp",
@@ -218,8 +225,9 @@ def test_score_synthetic_pcap(protocol, suffix, final_models, tmp_path, monkeypa
             or row["autoencoder_reconstruction_error"] >= checkpoint["anomaly_threshold"]
         )
     if protocol == "icmp":
-        assert [row["start_timestamp"] for row in body] == [1000.0, 1030.0, 1060.0]
-        assert [row["end_timestamp"] for row in body] == [1020.0, 1050.0, 1090.0]
+        assert [row["flow_id"] for row in body] == ["0_w0", "0_w1", "0_w2", "1"]
+        assert [row["start_timestamp"] for row in body] == [1000.0, 1030.0, 1060.0, 1100.0]
+        assert [row["end_timestamp"] for row in body] == [1020.0, 1050.0, 1090.0, 1100.0]
     assert seen_paths and not seen_paths[0].exists() and not seen_paths[0].parent.exists()
     with TestClient(api.app) as client:
         truncated = client.post(

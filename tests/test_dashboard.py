@@ -57,6 +57,11 @@ def test_dashboard_results_and_mixed_flow_ids(protocol):
         assert "100% of available data" in app.warning[0].value
         assert "leave-one-session-out" in app.info[0].value
         assert any("n=4 legit sessions; n=2 covert sessions" in c.value for c in app.caption)
+        assert any(
+            "Flag rate here is not directly comparable to the Evaluation Results tab" in c.value
+            and "including all covert sessions" in c.value
+            for c in app.caption
+        )
         charts = app.get("vega_lite_chart")
         assert len(charts) == 2
         comparison = app.dataframe[0].value

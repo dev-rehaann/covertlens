@@ -216,6 +216,8 @@ def score(file: UploadFile, protocol: Protocol, response: Response) -> list[dict
             output = features[
                 ["flow_id", "start_timestamp", "end_timestamp", "packet_count"]
             ].copy()
+            # Short-flow IDs are integers; window IDs have suffixes. Keep the API type uniform.
+            output["flow_id"] = output["flow_id"].astype(str)
             output["isolation_forest_score"] = forest_scores
             output["autoencoder_reconstruction_error"] = autoencoder_scores
             output["flagged_by_either"] = forest_scores.ge(thresholds[0]) | autoencoder_scores.ge(

@@ -277,7 +277,7 @@ def live_scoring_demo():
     if flows.empty:
         st.info("No usable flow windows were returned for this capture.")
         return
-    # Windowed and unwindowed identifiers mix strings/integers; Arrow needs one type.
+    # Defensive compatibility for session-cached results from older API versions.
     flows["flow_id"] = flows["flow_id"].astype(str)
     flows.insert(
         0,
@@ -289,6 +289,11 @@ def live_scoring_demo():
     count.metric("Flow windows", f"{len(flows):,}")
     flags.metric("Flagged by either model", f"{flagged:,}")
     packets.metric("Packets analyzed", f"{flows['packet_count'].sum():,}")
+    st.caption(
+        "Flag rate here is not directly comparable to the Evaluation Results tab — "
+        "this model is trained on the full dataset, including all covert sessions, "
+        "so its calibration differs from the leave-one-session-out evaluation."
+    )
     st.caption("A flag is a demo anomaly indication, not proof of a covert channel.")
     st.subheader("Model scores by flow")
     chart_text = "#c7d2cf" if st.context.theme.type == "dark" else "#43504b"
