@@ -1,0 +1,9 @@
+# Optional native Streamlit theme; loaded via --theme.base dashboard-theme.toml.
+[theme]
+base = "light"
+primaryColor = "#21665d"
+backgroundColor = "#f7f7f3"
+secondaryBackgroundColor = "#eceee8"
+textColor = "#202b2b"
+font = "sans-serif"
+borderColor = "#c6cec7"

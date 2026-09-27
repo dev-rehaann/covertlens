@@ -104,10 +104,12 @@ uvicorn covertlens.dashboard.api:app --reload --port 8000
 Terminal 2 starts the Streamlit frontend (explicitly bound to localhost):
 
 ```bash
-streamlit run src/covertlens/dashboard/app.py --server.address 127.0.0.1
+streamlit run src/covertlens/dashboard/app.py --server.address 127.0.0.1 --theme.base dashboard-theme.toml
 ```
 
 Open `http://localhost:8501` in your browser. If the console commands are not on `PATH`, use `python -m uvicorn` and `python -m streamlit` respectively with the same arguments. `--reload` is for local development, not deployment.
+
+`dashboard-theme.toml` supplies the restrained light research-workbench palette through Streamlit's native theme system. Omit the theme argument to use your preferred Streamlit theme; controls remain native and keyboard-accessible. The dashboard uses local system fonts, not external font or image services.
 
 **Evidence distinction:** Evaluation Results presents the credible Phase 3 LOSO findings on held-out lab sessions, with the small session counts and limitations visible. Live Scoring Demo is illustrative only: its final models were trained on 100% of available flows with nothing held out. Its flags are not equivalent evaluation evidence or proof of a covert channel. See [docs/notes.md](docs/notes.md) for the LOSO methodology and limitations.
 
