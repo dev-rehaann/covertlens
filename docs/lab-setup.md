@@ -23,8 +23,8 @@ Host workstation (management and offline file transfer only)
  - tshark capture                               - lab-only DNS service
  - baseline DNS/ICMP generator                  - iodined
  - iodine/dnscat2 clients                       - dnscat2 server
- - ptunnel/icmpsh clients                       - ptunnel server
-                                                 - icmpsh listener
+ - ptunnel/Hans clients                         - ptunnel server
+                                                 - Hans server
 ```
 
 Use a host-only or hypervisor-internal network. Do not use a bridged adapter.
@@ -86,9 +86,15 @@ sudo apt install --yes ruby ruby-dev libssl-dev libpcap-dev dnsmasq
 ```
 
 Do not automate installation or configuration of Iodine, dnscat2, ptunnel, or
-icmpsh. Obtain them manually from their official repositories, verify what will
+Hans. Obtain them manually from their official repositories, verify what will
 run, and keep them inside these VMs. `lab-server` hosts the server/listener role;
 `lab-client` hosts only the corresponding client role.
+
+The current ICMP dataset uses ptunnel and native-Linux Hans. The attempted
+icmpsh/Wine path was abandoned and is not included in the labeled dataset.
+The capture wrapper retains its historical `icmpsh` option; that is not evidence
+of a validated capture. See [requirements-lab.txt](../requirements-lab.txt) for
+upstream tool references; do not bundle their code in this repository.
 
 ### 4. Prepare isolated baseline services
 
@@ -151,6 +157,13 @@ VMs, and correct the virtual network before continuing.
 6. Rebuild the manifest and feature dataset only after all expected files are
    present.
 
+Collect separate baseline and covert sessions, retaining the original capture
+identity for LOSO fold grouping; time windows do not create independent sessions.
+Keep tool passwords local and never include them in notes, commits, or screenshots.
+Follow the [README pipeline](../README.md#full-pipeline-from-scratch) for evaluation
+and final-model training on the processing machine. Keep capture VMs isolated;
+they are not dashboard deployment hosts.
+
 ## Capture file naming
 
 All captures must use:
@@ -160,9 +173,13 @@ data/raw/{protocol}_{source}_{condition}_{timestamp}.pcap
 ```
 
 - `protocol`: `dns` or `icmp`
-- `source`: `baseline`, `iodine`, `dnscat2`, `ptunnel`, or `icmpsh`
+- `source`: `baseline` or a tool identifier such as `iodine`, `dnscat2`,
+  `ptunnel`, or `hans`; the manifest parser does not use a fixed tool enum
 - `condition`: `legit` or `covert`
 - `timestamp`: UTC `YYYYMMDDTHHMMSSZ`
+
+The scripts generate this UTC format with `date -u +%Y%m%dT%H%M%SZ`, matching
+the manifest parser. Do not substitute the older `YYYYMMDD-HHMM` convention.
 
 Examples:
 
@@ -170,7 +187,11 @@ Examples:
 data/raw/dns_baseline_legit_20260829T120000Z.pcap
 data/raw/dns_iodine_covert_20260829T121500Z.pcap
 data/raw/icmp_ptunnel_covert_20260829T123000Z.pcap
+data/raw/icmp_hans_covert_20260829T124500Z.pcap
 ```
 
 Raw captures may contain addresses and query names. They are ignored by Git and
 must not be committed; sanitize any capture before sharing it.
+Public demonstration downloads belong in the ignored `samples/` folder, not
+this labeled lab inventory. They do not acquire ground-truth labels merely
+because a publisher describes them as tunnel traffic.

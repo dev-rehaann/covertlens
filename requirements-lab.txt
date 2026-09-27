@@ -12,5 +12,8 @@
 # ICMP tunnel used only to generate labeled traffic in an isolated, authorized lab VM.
 # ptunnel (ptunnel-ng): https://github.com/utoni/ptunnel-ng
 
-# ICMP shell used only to generate labeled traffic in an isolated, authorized lab VM.
+# Native Linux IP-over-ICMP tunnel used for isolated, authorized validation traffic.
+# Hans: https://github.com/friedrich/hans
+
+# Historical ICMP shell reference; the Wine approach was abandoned, not used in the dataset.
 # icmpsh: https://github.com/bdamele/icmpsh

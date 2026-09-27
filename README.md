@@ -54,8 +54,10 @@ flowchart LR
 - `src/` — the `covertlens` package, organized into capture, feature extraction, modeling, and dashboard components.
 - `notebooks/` — exploratory analysis notebooks; generated notebook artifacts are not tracked.
 - `tests/` — automated tests for the detection pipeline.
-- `docs/` — [isolated-lab setup](docs/lab-setup.md), [Phase 0–3 findings and methodology notes](docs/notes.md), and literature-review notes.
+- `docs/` — [isolated-lab setup](docs/lab-setup.md), [Phase 0–4 findings and methodology notes](docs/notes.md), and literature-review notes.
 - `scripts/` — one-off repository setup and isolated-lab support scripts.
+- `models_release/` — locally regenerated demo models, scalers, feature order, and thresholds; only its directory marker is tracked.
+- `samples/` — optional local public captures for dashboard checks; the entire folder is gitignored.
 
 ## Setup instructions
 
@@ -98,7 +100,7 @@ Optional diagnostics after feature extraction are `python scripts/inspect_featur
 After the pipeline completes, keep two terminals open at the repository root. Terminal 1 starts the FastAPI backend on localhost:
 
 ```bash
-uvicorn covertlens.dashboard.api:app --reload --port 8000
+uvicorn covertlens.dashboard.api:app --host 127.0.0.1 --reload --port 8000
 ```
 
 Terminal 2 starts the Streamlit frontend (explicitly bound to localhost):
@@ -120,6 +122,20 @@ The dashboard uses `http://localhost:8000` by default; set `COVERTLENS_API_URL` 
 - `POST /score?protocol=dns` or `icmp` — upload a `.pcap`/`.pcapng` as multipart field `file` (maximum 50 MiB). Returns per-flow/window timestamps, packet counts, both anomaly scores, and `flagged_by_either` at the saved training-score 90th-percentile thresholds.
 
 The scoring response carries `X-Covertlens-Evidence` and `X-Covertlens-Warning` headers: it is a **full-data live demo, not LOSO evidence**. Upload scores never recalibrate thresholds. Temporary capture files are removed after processing, including failures. This unauthenticated research API is for local/authorized lab use, not public deployment; load only trusted, locally generated model artifacts. Models and feature-name files are regeneratable and gitignored. Rerun `train_final` if older artifacts lack saved thresholds.
+
+### External-sample demo checks
+
+The live-scoring path was also exercised through the API and browser with four public captures: Iodine, dns2tcp, dnscat2, and a CTF IP-over-ICMP sample. All returned finite scores from both models and rendered successfully. See [docs/notes.md](docs/notes.md) for sources, counts, and interpretation.
+
+Keep these downloads in the ignored `samples/` folder, select the matching DNS or ICMP protocol, and upload them through Live Scoring Demo. They are not part of the 12-session training dataset or LOSO results. Do not move them into `data/raw/` or assign ground-truth labels without a separate, documented validation process. A flag means the model found the sample anomalous, not that detection accuracy or generalization has been established. Public availability does not imply permission to redistribute a capture.
+
+### Hosting and Vercel
+
+The current repository is a local research application, not a ready-to-deploy Vercel project. It runs a Streamlit server and a FastAPI backend, requires the native TShark executable for parsing, and loads local model artifacts and result CSVs that are deliberately absent from Git. Importing the repository into Vercel alone will not provision or launch this stack.
+
+Vercel supports [FastAPI applications](https://vercel.com/kb/guide/ship-a-fastapi-app-on-vercel) and [WebSocket connections](https://vercel.com/kb/guide/do-vercel-serverless-functions-support-websocket-connections); lack of WebSocket support is not the objection. However, the standard [Vercel Functions request/response body limit is 4.5 MB](https://vercel.com/docs/functions/limitations), below this API's 50 MiB upload allowance. Runtime packaging, native TShark availability, model provisioning, and Streamlit's session lifecycle would need a separately designed and tested deployment.
+
+A persistent Linux VM or container host is a better fit for the existing two-process application. Vercel could host a separate static results site or frontend backed by that server, but this is not implemented. Before any public exposure, add authentication, request/concurrency limits, parser isolation, and a documented capture-retention policy; provision trusted artifacts privately rather than committing them. Do not expose the isolated capture VMs as web servers. See [SECURITY.md](SECURITY.md).
 
 ### Evaluation and initial findings
 
