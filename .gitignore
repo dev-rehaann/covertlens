@@ -34,6 +34,9 @@ Thumbs.db
 *.key
 
 # Sensitive captures, extracted features, and external datasets
+*.pcap
+*.pcapng
+samples/
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
