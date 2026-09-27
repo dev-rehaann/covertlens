@@ -72,9 +72,11 @@ STYLE = """
 
 def request_backend(method: str, path: str, **kwargs):
     """Show API errors inline without preventing the other tab from rendering."""
+    # Both tabs execute on reruns; a results fetch must not block uploads for five minutes.
+    timeout = (5, 300 if method.upper() == "POST" else 10)
     try:
         with requests.request(
-            method, f"{API_BASE_URL}{path}", timeout=(5, 300), **kwargs
+            method, f"{API_BASE_URL}{path}", timeout=timeout, **kwargs
         ) as response:
             if not response.ok:
                 try:
@@ -84,11 +86,14 @@ def request_backend(method: str, path: str, **kwargs):
                 st.error(f"Backend returned HTTP {response.status_code}: {detail}")
                 return None
             return response.json()
-    except (requests.RequestException, ValueError):
-        st.error(
-            f"Could not get a valid response from {API_BASE_URL}. "
-            "Check that the FastAPI backend is running, then retry."
-        )
+    except (requests.RequestException, ValueError) as error:
+        st.error(f"Backend request failed at {API_BASE_URL}{path}: {type(error).__name__}: {error}")
+        if isinstance(error, requests.Timeout):
+            st.caption(
+                "The backend may still be processing. Check its terminal and wait before retrying."
+            )
+        else:
+            st.caption("Check that the FastAPI backend is running at the URL above, then retry.")
         return None
 
 
@@ -258,10 +263,18 @@ def live_scoring_demo():
     # Session-local results prevent duplicate uploads on unrelated widget reruns.
     # Do not globally cache captures or save uploaded traffic to the repository.
     key = (API_BASE_URL, protocol, hashlib.sha256(upload.getbuffer()).hexdigest())
+    st.caption(
+        f"Upload received by Streamlit: {len(upload.getbuffer()) / (1024 * 1024):.3f} MiB. "
+        f"Scoring backend: {API_BASE_URL}."
+    )
     saved = st.session_state.get("demo_result")
     if retry or saved is None or saved[0] != key:
         st.session_state.pop("demo_result", None)
-        with st.spinner("Extracting flow windows and scoring with both demo models..."):
+        with st.spinner(
+            "Extracting flow windows and scoring with both demo models. "
+            "Larger captures may take a minute or more...",
+            show_time=True,
+        ):
             rows = request_backend(
                 "POST",
                 "/score",

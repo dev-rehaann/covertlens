@@ -1,10 +1,12 @@
 """Presentation regression: preserve evidence labels and mixed window IDs."""
 
+import runpy
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 from streamlit.testing.v1 import AppTest
 
 
@@ -32,8 +34,13 @@ def test_dashboard_results_and_mixed_flow_ids(protocol):
     def respond(method, url, **kwargs):
         if method == "GET":
             assert url.endswith(f"/results/{protocol}")
+            assert kwargs["timeout"] == (5, 10)
         else:
             assert kwargs["params"]["protocol"] == protocol
+            assert kwargs["timeout"] == (5, 300)
+            assert kwargs["files"] == {
+                "file": ("fixture.pcap", b"fixture", "application/octet-stream")
+            }
         response = MagicMock()
         response.ok = True
         response.json.return_value = results if method == "GET" else rows
@@ -57,6 +64,7 @@ def test_dashboard_results_and_mixed_flow_ids(protocol):
         assert "100% of available data" in app.warning[0].value
         assert "leave-one-session-out" in app.info[0].value
         assert any("n=4 legit sessions; n=2 covert sessions" in c.value for c in app.caption)
+        assert any("Upload received by Streamlit" in c.value for c in app.caption)
         assert any(
             "Flag rate here is not directly comparable to the Evaluation Results tab" in c.value
             and "including all covert sessions" in c.value
@@ -74,3 +82,43 @@ def test_dashboard_results_and_mixed_flow_ids(protocol):
         app.run()
         assert not app.exception
         assert sum(c.args[0] == "POST" for c in request.call_args_list) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        requests.ConnectionError("connection refused"),
+        requests.ReadTimeout("read timed out"),
+        ValueError("invalid JSON"),
+    ],
+)
+def test_backend_exception_is_visible(error):
+    path = Path(__file__).resolve().parents[1] / "src/covertlens/dashboard/app.py"
+    request_backend = runpy.run_path(str(path))["request_backend"]
+    with (
+        patch("requests.request", side_effect=error),
+        patch("streamlit.error") as show_error,
+        patch("streamlit.caption") as show_caption,
+    ):
+        assert request_backend("POST", "/score") is None
+    message = show_error.call_args.args[0]
+    assert type(error).__name__ in message and str(error) in message
+    assert "/score" in message
+    assert show_caption.called
+    if isinstance(error, requests.Timeout):
+        assert "wait before retrying" in show_caption.call_args.args[0]
+
+
+@pytest.mark.parametrize("status", [400, 413, 422, 500])
+def test_backend_http_error_is_visible(status):
+    path = Path(__file__).resolve().parents[1] / "src/covertlens/dashboard/app.py"
+    request_backend = runpy.run_path(str(path))["request_backend"]
+    response = MagicMock()
+    response.ok = False
+    response.status_code = status
+    response.json.return_value = {"detail": "fixture failure detail"}
+    response.__enter__.return_value = response
+    with patch("requests.request", return_value=response), patch("streamlit.error") as show_error:
+        assert request_backend("POST", "/score") is None
+    assert f"HTTP {status}" in show_error.call_args.args[0]
+    assert "fixture failure detail" in show_error.call_args.args[0]
